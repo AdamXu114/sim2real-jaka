@@ -67,6 +67,7 @@ MIN_HEIGHT_TIMER_NAME = "pico_retarget_pub.apply_min_link_height"
 BUILD_PAYLOAD_TIMER_NAME = "pico_retarget_pub.build_payload"
 SAMPLE_TIMER_NAME = "pico_retarget_pub.sample_and_retarget"
 SEND_TIMER_NAME = "pico_retarget_pub.send_payload"
+TOGGLE_DATA_COLLECTION_KEY = "toggle_data_collection"
 
 
 @dataclass(frozen=True)
@@ -265,6 +266,10 @@ class LiveRetargetPublisher:
         self._latest_controller_t_ns = 0
         self._last_mode_hint_monotonic = 0.0
 
+        # A-button toggle, broadcast to subscribers so they can start/stop data collection.
+        self.toggle_data_collection = False
+        self._a_button_was_pressed = False
+
         self._controller_sock = zmq.Context.instance().socket(zmq.PUB)
         self._controller_sock.setsockopt(zmq.LINGER, 0)
         self._controller_sock.setsockopt(zmq.SNDHWM, int(args.controller_hwm))
@@ -441,7 +446,7 @@ class LiveRetargetPublisher:
         qpos[3:7] = pelvis_quat_yaw.copy()
         return qpos
 
-    def _poll_pause_toggle(self) -> bool:
+    def _poll_pause_toggle(self) -> Optional[PicoControllerStateMessage]:
         with ScopedTimer(POLL_TIMER_NAME):
             try:
                 controller_data = self.streamer.get_controller_data()
@@ -450,13 +455,13 @@ class LiveRetargetPublisher:
                 if now - self.last_stream_wait_log_monotonic > 2.0:
                     print(f"[Info] Waiting for PICO controller data... ({exc})")
                     self.last_stream_wait_log_monotonic = now
-                return False
+                return None
 
             controller_state = _pico_controller_state_from_data(controller_data)
             self._latest_controller_t_ns = int(controller_state.timestamp_ns)
             self._publish_controller_state(controller_state)
 
-            return controller_state.X
+            return controller_state
 
     def _publish_controller_state(self, controller_state: PicoControllerStateMessage) -> None:
         try:
@@ -481,6 +486,7 @@ class LiveRetargetPublisher:
                 PUBLISH_T_NS_KEY: publish_t_ns,
                 SMPLX_T_NS_KEY: int(source_smplx_t_ns),
                 "paused": self.paused,
+                TOGGLE_DATA_COLLECTION_KEY: [bool(self.toggle_data_collection)],
                 JOINT_POS_KEY: np.asarray(joint_pos, dtype=np.float32).tolist(),
                 BODY_POS_W_KEY: np.asarray(body_pos_w, dtype=np.float32).tolist(),
                 BODY_QUAT_W_KEY: np.asarray(body_quat_w, dtype=np.float32).tolist(),
@@ -561,7 +567,14 @@ class LiveRetargetPublisher:
 
     def sample_and_retarget(self) -> Optional[dict[str, object]]:
         with ScopedTimer(SAMPLE_TIMER_NAME):
-            x_pressed = self._poll_pause_toggle()
+            controller_state = self._poll_pause_toggle()
+            if controller_state is not None:
+                x_pressed = controller_state.X
+                a_pressed = controller_state.A
+            else:
+                x_pressed = False
+                a_pressed = False
+
             if x_pressed and not self._x_button_was_pressed:
                 self.paused = not self.paused
 
@@ -572,8 +585,17 @@ class LiveRetargetPublisher:
                 print(f"[Info] paused toggled to {self.paused} via PICO X button")
             self._x_button_was_pressed = x_pressed
 
+            if a_pressed and not self._a_button_was_pressed:
+                self.toggle_data_collection = not self.toggle_data_collection
+                print(
+                    "[Info] toggle_data_collection toggled to "
+                    f"{self.toggle_data_collection} via PICO A button"
+                )
+            self._a_button_was_pressed = a_pressed
+
             self._maybe_print_mode_hint()
             if self.paused:
+              
                 return self._build_payload(
                     source_smplx_t_ns=self._latest_controller_t_ns,
                     body_pos_w=self.paused_body_pos_w,
@@ -611,7 +633,7 @@ class LiveRetargetPublisher:
             xrobot_frame = None
             if isinstance(processed_human_data, dict) and processed_human_data:
                 xrobot_frame = _xrobot_body_frame_from_pose_dict(processed_human_data)
-
+            #print("wwwwwwwwwwwwwwwwwwww")
             if self.args.skip_retarget:
                 with ScopedTimer(SKIP_MAP_TIMER_NAME):
                     robot_body_pose_dict = self._robot_body_pose_dict_from_human_pose_dict(processed_human_data)
@@ -643,7 +665,7 @@ class LiveRetargetPublisher:
                 for i, qpos_adr in enumerate(self.joint_qpos_indices):
                     if qpos_adr != -1:
                         qpos[7 + i] = configuration_data.qpos[qpos_adr]
-                        
+                print(body_quat_w,"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
                 return self._build_payload(
                     source_smplx_t_ns=int(source_smplx_t_ns),
                     body_pos_w=body_pos_w,

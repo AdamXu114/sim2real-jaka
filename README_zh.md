@@ -32,9 +32,8 @@ python sim2real/rl_policy/tracking.py \
 - [快速上手](https://egalahad.github.io/sim2real/zh-Hans/getting-started/overview)
 - [Root Project Setup](https://egalahad.github.io/sim2real/zh-Hans/getting-started/root-project)
 - [离线动作跟踪教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/offline-motion-tracking)
-- [Pico Teleoperation 教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/pico-teleoperation)
+  - [Pico Teleoperation  教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/pico-teleoperation)
 - [Motion Recording 教程](https://egalahad.github.io/sim2real/zh-Hans/tutorials/motion-recording)
-
 
 ## 1. Start the Pico retarget publisher
 
@@ -47,3 +46,4 @@ python sim2real/teleop/pico_retarget_pub.py --bind tcp://*:28701 --publish_hz 50
 ```bash
 python sim2real/teleop/realtime_viewer.py --connect tcp://127.0.0.1:28701 --viewer_hz 50
 ```
+
