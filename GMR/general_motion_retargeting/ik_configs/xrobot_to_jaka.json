@@ -394,7 +394,7 @@
         ],
         "Left_elbow_Link": [
             "Left_Elbow",
-            10,
+            5,
             5,
             [
                 0.0,
@@ -410,7 +410,7 @@
         ],
         "Left_wrist_yaw_Link": [
             "Left_Wrist",
-            30,
+            10,
             10,
             [
                 0.0,
@@ -442,7 +442,7 @@
         ],
         "Right_elbow_Link": [
             "Right_Elbow",
-            10,
+            5,
             5,
             [
                 0.0,
@@ -458,7 +458,7 @@
         ],
         "Right_wrist_yaw__Link": [
             "Right_Wrist",
-            30,
+            10,
             10,
             [
                 0.0,

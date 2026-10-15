@@ -262,6 +262,9 @@ class LiveRetargetPublisher:
         self.min_link_height_offset_frame_count = 0
         self.paused = True
         self._needs_live_pelvis_init = False
+        # Hold off publishing anything until the first X press starts live tracking, so
+        # subscribers never see the default (paused) pose before the first live frame.
+        self._live_started = False
         self._x_button_was_pressed = False
         self._latest_controller_t_ns = 0
         self._last_mode_hint_monotonic = 0.0
@@ -582,6 +585,7 @@ class LiveRetargetPublisher:
                     self._capture_paused_qpos()
                 else:
                     self._needs_live_pelvis_init = True
+                    self._live_started = True
                 print(f"[Info] paused toggled to {self.paused} via PICO X button")
             self._x_button_was_pressed = x_pressed
 
@@ -595,7 +599,10 @@ class LiveRetargetPublisher:
 
             self._maybe_print_mode_hint()
             if self.paused:
-              
+                if not self._live_started:
+                    # Startup pause: stay silent until the first X press.
+                    return None
+
                 return self._build_payload(
                     source_smplx_t_ns=self._latest_controller_t_ns,
                     body_pos_w=self.paused_body_pos_w,
@@ -665,7 +672,7 @@ class LiveRetargetPublisher:
                 for i, qpos_adr in enumerate(self.joint_qpos_indices):
                     if qpos_adr != -1:
                         qpos[7 + i] = configuration_data.qpos[qpos_adr]
-                print(body_quat_w,"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+                # print(body_quat_w,"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
                 return self._build_payload(
                     source_smplx_t_ns=int(source_smplx_t_ns),
                     body_pos_w=body_pos_w,
